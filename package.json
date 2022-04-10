@@ -1,0 +1,24 @@
+{
+  "dependencies": {
+    "crc": "^4.1.1",
+    "moment": "^2.29.2"
+  },
+  "name": "iot-gateway-server",
+  "description": "missing: \r node_modules, \r *.pem, \r package.json,\r package-lock.json",
+  "version": "1.0.0",
+  "main": "app.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IMBUILDINGS/iot-gateway-server.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/IMBUILDINGS/iot-gateway-server/issues"
+  },
+  "homepage": "https://github.com/IMBUILDINGS/iot-gateway-server#readme"
+}

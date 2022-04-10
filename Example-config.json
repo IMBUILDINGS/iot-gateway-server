@@ -1,0 +1,9 @@
+{
+    "logfile":"./log.txt",
+    "listenport":2101,
+    "tlslistenport":2100,
+    "timeout": 15,
+    "datatimeout": 30,
+    "checkinterval": 60,
+    "set_clock_interval":1
+}
