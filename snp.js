@@ -63,7 +63,8 @@ module.exports = class SNP extends EventEmitter {
 	PacketType = {
 		SensorData: 0x01,
 		CommandSet: 0x10,
-		Answer: 0x11
+		Answer: 0x11,
+		ErrorEEPROMData: 0x21
 	};
 
 	uP = {
@@ -265,6 +266,10 @@ module.exports = class SNP extends EventEmitter {
 					parsedData.sequence = parsedPacket.data[parsedPacket.data.length - 1];
 				}
 
+				if(parsedPacket.packetType == this.PacketType.ErrorEEPROMData){
+					parsedData.content = 'erroreepromdata';
+				}
+
 				break;
 			case this.DstSrc.configEEPROM:
 				if (parsedPacket.packetType == this.PacketType.Answer &&
@@ -320,32 +325,86 @@ module.exports = class SNP extends EventEmitter {
 		}
 	}
 
-	processReceiveBuffer() {
+	processReceiveBuffer(){
+		while(this.rcvBuffer.length >= 6){
+			console.log('Checking this buffer: ', this.rcvBuffer.toString('hex'));
+			let dataLength = this.rcvBuffer[2];
+			let packetStart = 0;
+			let packetEnd = dataLength + 5;
+
+			if(dataLength >= 64 || dataLength == 0){
+				console.log(`${this.id}: Incorrect length detected (${dataLength})`);
+				console.log(this.rcvBuffer.toString('hex'));
+				let newBuffer = Buffer.alloc(this.rcvBuffer.length - 1);
+				this.rcvBuffer.copy(newBuffer, 0, 1, this.rcvBuffer.length);
+				this.rcvBuffer = newBuffer;
+				continue;
+			}
+
+			//Check for valid packet
+			let packet = Buffer.alloc(dataLength + 5);
+			this.rcvBuffer.copy(packet, 0, packetStart, packetEnd);
+			let validPacket = this.checkCRC(packet);
+
+			if(validPacket){
+				console.log('Valid packet added to packetbuffer');
+				this.packetBuffer.push(packet);
+				this.bufferSynced = true;
+				this.rcvBuffer = this.rcvBuffer.slice(packetEnd, this.rcvBuffer.length);
+			}else{
+				console.log(`${this.id}: No valid packet found in buffer (${this.rcvBuffer.length})`);
+				console.log(this.rcvBuffer.toString('hex'));
+				let newBuffer = Buffer.alloc(this.rcvBuffer.length - 1);
+				this.rcvBuffer.copy(newBuffer, 0, 1, this.rcvBuffer.length);
+				this.rcvBuffer = newBuffer;
+			}
+		}
+	}
+
+	processReceiveBuffer2() {
 		let i = 0;
 		while (i < this.rcvBuffer.length) {
+			console.log('Checking this buffer: ', this.rcvBuffer.toString('hex'));
+			console.log('Here is i', i);
 			if (this.rcvBuffer.length < 6) return;
 			let dataLength = this.rcvBuffer[i + 2];
 			let packetStart = i;
 			let packetEnd = i + dataLength + 5;
+
+			if(dataLength >= 64 || dataLength == 0){
+				console.log(`${this.id}: No valid packet found in buffer (${this.rcvBuffer.length})`);
+				console.log(this.rcvBuffer.toString('hex'));
+				let newBuffer = Buffer.alloc(this.rcvBuffer.length - 1);
+				this.rcvBuffer.copy(newBuffer, 0, 1, this.rcvBuffer.length);
+				this.rcvBuffer = newBuffer;
+				i++;
+				continue;
+			}
 
 			if (this.rcvBuffer.length >= dataLength + 5 && (dataLength < 64 || dataLength != 0)) {
 				let packet = Buffer.alloc(dataLength + 5);
 				this.rcvBuffer.copy(packet, 0, packetStart, packetEnd);
 				let validPacket = this.checkCRC(packet);
 				if (validPacket) {
+					console.log('Valid packet added to packetbuffer');
 					this.packetBuffer.push(packet);
 					this.bufferSynced = true;
 					this.rcvBuffer = this.rcvBuffer.slice(packetEnd, this.rcvBuffer.length);
 					i = 0;
 				} else if (this.bufferSynced == false || (this.bufferSynced == true && validPacket == false)) {
 					console.log(`${this.id}: No valid packet found in buffer (${this.rcvBuffer.length})`);
+					console.log(this.rcvBuffer.toString('hex'));
 					let newBuffer = Buffer.alloc(this.rcvBuffer.length - 1);
 					this.rcvBuffer.copy(newBuffer, 0, 1, this.rcvBuffer.length);
 					this.rcvBuffer = newBuffer;
 					i++;
+				}else{
+					console.log(this.bufferSynced);
+					console.log(this.validPacket);
 				}
 			} else {
-				return;
+				console.log(this.rcvBuffer.length, dataLength);
+				//return;
 			}
 		}
 	}
@@ -398,6 +457,12 @@ module.exports = class SNP extends EventEmitter {
 						this.socket.write(packet);
 						return this.parseSensorData(parsedData);
 					}
+					break;
+				case 'erroreepromdata':
+					console.log(`Invalid EEPROM data ... skipping`);
+					let command = this.uP.cmdIncreaseReadPointer();
+					let packet = this.createPacket(this.DstSrc.uP, this.DstSrc.Server, this.PacketType.CommandSet, command);
+					this.socket.write(packet);
 					break;
 				case 'nodeinfo':
 					if (parsedData.nodeIndex != this.nodes.length) break; //only process when it is the next node

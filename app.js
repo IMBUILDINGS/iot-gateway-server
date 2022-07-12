@@ -12,7 +12,6 @@ function onTCPConnect(socket) {
         console.log("payload: \n" + data.toString('HEX'));
         console.log('The gateway id: '+ snp.id);
     });
-    console.log(snp.DstSrc);
     // console.log(snp.PacketType);
     // console.log(snp.uP);
     // console.log(snp.ConfigEEPROM);
